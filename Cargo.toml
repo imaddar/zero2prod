@@ -41,3 +41,6 @@ features = [
 ]
 
 [dev-dependencies]
+fake = "~2.3"
+quickcheck = "0.9.2"
+quickcheck_macros = "0.9.1"
