@@ -1,4 +1,4 @@
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use secrecy::ExposeSecret;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
@@ -7,15 +7,14 @@ use zero2prod::configuration::{DatabaseSettings, get_configuration};
 use zero2prod::startup::run;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
-static TRACING: Lazy<()> = Lazy::new(|| {
+static TRACING: LazyLock<()> = LazyLock::new(|| {
     let default_filter_level = "info".to_string();
     let subscriber_name = "test".to_string();
-
     if std::env::var("TEST_LOG").is_ok() {
         let subscriber = get_subscriber(subscriber_name, default_filter_level, std::io::stdout);
         init_subscriber(subscriber);
     } else {
-        let subscriber = get_subscriber(subscriber_name, default_filter_level, std::io::sink);
+        let subscriber = get_subscriber(subscriber_name, "off".into(), std::io::sink);
         init_subscriber(subscriber);
     };
 });
@@ -26,7 +25,7 @@ pub struct TestApp {
 }
 
 async fn spawn_app() -> TestApp {
-    Lazy::force(&TRACING);
+    LazyLock::force(&TRACING);
 
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     let port = listener.local_addr().unwrap().port();
@@ -122,7 +121,7 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
 }
 
 #[tokio::test]
-async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
+async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() {
     // Arrange
     let app = spawn_app().await;
     let client = reqwest::Client::new();
@@ -142,9 +141,9 @@ async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
             .expect("Failed to execute request.");
         // Assert
         assert_eq!(
-            200,
+            400,
             response.status().as_u16(),
-            "The API did not return a 200 OK when the payload was {}.",
+            "The API did not return a 400 Bad Request when the payload was {}.",
             description
         );
     }
